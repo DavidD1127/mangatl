@@ -1,5 +1,5 @@
 ---
-name: manga-lettering
+name: mangatl
 description: 给条漫/漫画做中文嵌字——OCR 定位气泡、填译文、自动排版盖住原文、复检漏翻、导出 PDF/CBZ/网页。当用户要把外语漫画翻成中文、给已有图片替换文字、或者批量处理多话嵌字时使用。
 ---
 
