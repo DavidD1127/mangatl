@@ -1,0 +1,11 @@
+{
+  "name": "示例作品",
+  "width": 900,
+  "page_height": 1273,
+  "dpi": 110,
+  "font": "C:/Windows/Fonts/msyhbd.ttc",
+  "skip_top": 0,
+  "skip_bottom": 0,
+  "row_min_score": 0.4,
+  "_comment": "复制成 project.json 改字段。skip_top/skip_bottom 用来砍掉每章开头的汉化组扉页和结尾引流图；font 必须是支持中文的字体文件。"
+}

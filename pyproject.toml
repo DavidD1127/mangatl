@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mangatl"
+version = "0.1.0"
+description = "漫画翻译嵌字流水线：OCR 定位 -> 人工填译 -> 自动嵌字 -> 残留英文复检 -> 导出"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "mangatl contributors" }]
+keywords = ["manga", "webtoon", "scanlation", "ocr", "translation", "lettering"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: Multimedia :: Graphics",
+]
+
+dependencies = [
+  "pillow>=10.0",
+  "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+ocr = ["rapidocr-onnxruntime>=1.3"]
+pdf = ["pymupdf>=1.24"]
+all = ["rapidocr-onnxruntime>=1.3", "pymupdf>=1.24"]
+
+[project.scripts]
+mangatl = "mangatl.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mangatl*"]
