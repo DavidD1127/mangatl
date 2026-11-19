@@ -146,7 +146,7 @@ def _fit(text: str, font_path: str, box_w: float, box_h: float,
     # 先试整行
     for size in range(max_size, 27, -1):
         f = _load_font(font_path, size)
-        if f.getlength(text) <= box_w and int(size * 1.32) <= box_h:
+        if "\n" not in text and f.getlength(text) <= box_w and int(size * 1.32) <= box_h:
             return f, [text], int(size * 1.32)
 
     fallback = None
@@ -162,8 +162,7 @@ def _fit(text: str, font_path: str, box_w: float, box_h: float,
                 return f, lines, lh
     if fallback:
         return fallback
-    f = _load_font(font_path, min_size)
-    return f, _wrap(text, f, box_w), int(min_size * 1.2)
+    raise ValueError("译文在最小字号下仍放不下，请扩大 bbox 或缩短译文")
 
 
 def draw_block(im: Image.Image, draw: ImageDraw.ImageDraw, blk: dict,
@@ -188,7 +187,10 @@ def draw_block(im: Image.Image, draw: ImageDraw.ImageDraw, blk: dict,
     if not text:
         return
     bw, bh = box[2] - box[0] - 10, box[3] - box[1] - 8
-    font, lines, lh = _fit(text, font_path, bw, bh)
+    try:
+        font, lines, lh = _fit(text, font_path, bw, bh)
+    except ValueError as exc:
+        raise ValueError(f"文本块 {blk.get('id', '?')}: {exc}") from exc
     ty = box[1] + (box[3] - box[1] - lh * len(lines)) // 2
     for line in lines:
         tw = font.getlength(line)

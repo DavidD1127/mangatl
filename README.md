@@ -139,15 +139,22 @@ mangatl verify ./my-work --chapters 101
 
 列出还留着的英文块和坐标。照着回第 5 步补。
 
+OCR 或复检过程中，只要有一个图块识别失败，命令就会报错并停止，不会把不完整的结果写成“零残留”。已有的结果文件保持原样；修复依赖或输入后请重新运行，以命令成功完成为准。
+
 ### 8. 导出
 
 ```bash
 mangatl export ./my-work --chapters 101 --format pdf
 mangatl export ./my-work --chapters 101 --format cbz
 mangatl export ./my-work --format zip        # index.html + 全部分段 PNG
+mangatl export ./my-work --chapters 101 --format zip  # 仅打包第 101 话
 ```
 
 切页不是平均切：每页在目标位置前后 170px 内找一行最接近纯白的，在那儿下刀，避免把对话拦腰截断。
+
+切点超过目标页高时，JPEG 页面会相应加高，保留切点前的全部画面；PDF 仍使用 A4 页面。首尾裁剪按配置像素数处理，不会丢弃整张相交页面。
+
+如果译文缩到最小字号仍放不下，渲染会报出文本块编号，并在替换输出文件前停止。请扩大该块的 `bbox` 或缩短译文后重跑。译文中的手动换行会保留。
 
 **关于画质**：`pdf` / `cbz` 内部存的是 JPEG（质量 92），会有一次编码损失。要完全无损就导出 `zip`——里面的 PNG 是原图直出，配 `index.html` 直接在浏览器里滚动阅读。
 
@@ -178,6 +185,15 @@ mangatl export ./my-work --format zip        # index.html + 全部分段 PNG
 ## 用在 agent 里
 
 仓库带一份 `SKILL.md`，写清了给 AI 助手用时的操作顺序、每步该看什么、哪些地方必须停下来让人确认。放进支持 skill 的环境里可以直接调用。
+
+## 开发验证
+
+```bash
+python -m pip install -e .
+python -m unittest discover -s tests -v
+```
+
+测试使用合成图片和模拟 OCR，覆盖识别失败、章节选择、切页保真、译文溢出和命令行处理流程，不需要下载漫画或 OCR 模型。中文排版测试需要系统中文字体；GitHub Actions 在 Windows / Linux、Python 3.10 / 3.12 上运行。
 
 ## 许可与用途
 

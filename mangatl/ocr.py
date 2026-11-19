@@ -35,6 +35,8 @@ def _engine():
 
 
 def run(project: Project, chapter: int, win: int = WIN, overlap: int = OVERLAP) -> Path:
+    if not 0 <= overlap < win:
+        raise ValueError("OCR 参数必须满足 0 <= overlap < win")
     strip_path = project.strip_path(chapter)
     if not strip_path.exists():
         raise FileNotFoundError(f"{strip_path} 不存在，先跑 ingest")
@@ -61,10 +63,10 @@ def run(project: Project, chapter: int, win: int = WIN, overlap: int = OVERLAP) 
         tile.save(tile_path)
         try:
             res, _ = engine(str(tile_path), use_cls=False)
-        except Exception as exc:  # noqa: BLE001
-            print(f"  ! y={y} 识别失败：{exc}")
-            y += win - overlap
-            continue
+        except Exception as exc:
+            tile_path.unlink(missing_ok=True)
+            im.close()
+            raise RuntimeError(f"ch{chapter}: 识别在 y={y} 失败，未生成本次 OCR 结果") from exc
 
         for item in res or []:
             box, text, score = item[0], item[1], float(item[2])
@@ -85,6 +87,7 @@ def run(project: Project, chapter: int, win: int = WIN, overlap: int = OVERLAP) 
         y += win - overlap
 
     tile_path.unlink(missing_ok=True)
+    im.close()
     rows = sorted(seen.values(), key=lambda r: (r["y0"], r["x0"]))
     out = project.ocr_path(chapter)
     out.write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")

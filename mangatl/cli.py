@@ -78,14 +78,15 @@ def cmd_verify(args) -> None:
 def cmd_export(args) -> None:
     project = Project.load(args.dir)
     out_dir = Path(args.out).resolve() if args.out else None
-    for ch in _chapters(project, args.chapters):
+    chapters = _chapters(project, args.chapters)
+    for ch in chapters:
         if args.format == "zip":
             continue
         export.run(project, ch, args.format, out_dir)
     if args.format == "zip":
         target = (out_dir or (project.root / "dist"))
         target.mkdir(parents=True, exist_ok=True)
-        out = export.to_zip(project, target / f"{project.name}_cn.zip")
+        out = export.to_zip(project, target / f"{project.name}_cn.zip", chapters=chapters)
         print(f"  -> {out.name}  {out.stat().st_size/1024/1024:.0f} MB")
 
 

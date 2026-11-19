@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-import glob
+from html import escape
 import shutil
 import zipfile
 from pathlib import Path
@@ -22,6 +22,8 @@ SEARCH = 170  # 找空白行的搜索半径
 
 def cut_points(strip: Image.Image, page_height: int, search: int = SEARCH) -> list[int]:
     """返回切点列表（不含首尾）。"""
+    if page_height <= 0 or search < 0:
+        raise ValueError("page_height 必须大于 0，search 不能小于 0")
     arr = np.asarray(strip.convert("L"))
     h = strip.height
     cuts, y = [], 0
@@ -29,7 +31,7 @@ def cut_points(strip: Image.Image, page_height: int, search: int = SEARCH) -> li
         target = y + page_height
         if target >= h:
             break
-        lo = max(y + page_height // 2, target - search)
+        lo = max(y + 1, y + page_height // 2, target - search)
         hi = min(h - 2, target + search)
         best, best_v = target, -1e9
         for yy in range(lo, hi, 2):
@@ -43,7 +45,7 @@ def cut_points(strip: Image.Image, page_height: int, search: int = SEARCH) -> li
 
 
 def paginate(project: Project, chapter: int, tmp_dir: Path) -> list[Path]:
-    """把一话切成等高的页图（JPEG），返回路径列表。"""
+    """按空白切点分页；切点晚于目标时扩展页面，保留全部画面。"""
     files = project.segments(chapter)
     if not files:
         raise FileNotFoundError(f"{project.out_dir()} 里没有 {chapter} 的分段图")
@@ -57,23 +59,29 @@ def paginate(project: Project, chapter: int, tmp_dir: Path) -> list[Path]:
     idx = 0
 
     for i, f in enumerate(files):
-        strip = Image.open(f).convert("RGB")
-        if i == 0 and project.skip_top:
-            strip = strip.crop((0, project.skip_top, strip.width, strip.height))
+        with Image.open(f) as source:
+            strip = source.convert("RGB")
+        top = min(project.skip_top, strip.height) if i == 0 else 0
+        bottom = max(top, strip.height - project.skip_bottom) if f == last else strip.height
+        if top >= bottom:
+            strip.close()
+            continue
+        if top or bottom != strip.height:
+            cropped = strip.crop((0, top, strip.width, bottom))
+            strip.close()
+            strip = cropped
         bounds = [0] + cut_points(strip, project.page_height) + [strip.height]
         for a, b in zip(bounds, bounds[1:]):
-            if b - a <= 4:
-                continue
-            if f == last and project.skip_bottom and b >= strip.height - project.skip_bottom:
-                continue
-            piece = strip.crop((0, a, strip.width, min(b, a + project.page_height)))
-            page = Image.new("RGB", (project.width, project.page_height), (255, 255, 255))
+            piece = strip.crop((0, a, strip.width, b))
+            page = Image.new("RGB", (project.width, max(project.page_height, b - a)), (255, 255, 255))
             page.paste(piece, (0, 0))
             idx += 1
             out = tmp_dir / f"{idx:04d}.jpg"
             page.save(out, quality=92, optimize=True,
                       dpi=(project.dpi, project.dpi))
             pages.append(out)
+            piece.close()
+            page.close()
         strip.close()
     return pages
 
@@ -121,9 +129,10 @@ HTML_TPL = """<!doctype html>
 """
 
 
-def to_html(project: Project, title: str = "漫画中文嵌字版") -> Path:
+def to_html(project: Project, title: str = "漫画中文嵌字版",
+            chapters: list[int] | None = None) -> Path:
     """生成本地阅读页，引用同目录的分段 PNG。"""
-    chapters = sorted(project.chapters())
+    chapters = project.chapters() if chapters is None else sorted(set(chapters))
     body = []
     for ch in chapters:
         files = project.segments(ch)
@@ -133,17 +142,25 @@ def to_html(project: Project, title: str = "漫画中文嵌字版") -> Path:
         for f in files:
             body.append(f'<img src="out/{f.name}" loading="lazy" alt="{ch}">')
     out = project.root / "index.html"
-    out.write_text(HTML_TPL.format(title=title, body="\n".join(body)), encoding="utf-8")
+    out.write_text(HTML_TPL.format(title=escape(title), body="\n".join(body)), encoding="utf-8")
     return out
 
 
-def to_zip(project: Project, out: Path) -> Path:
-    """把 index.html 和全部分段 PNG 打成一个包。
+def to_zip(project: Project, out: Path, chapters: list[int] | None = None) -> Path:
+    """把 index.html 和所选章节的分段 PNG 打成一个包。
 
     PNG 是无损的，所以这里是唯一不产生二次压缩的导出路径。
     """
-    html = to_html(project)
-    files = sorted(glob.glob(str(project.out_dir() / "*.png")))
+    chapters = project.chapters() if chapters is None else sorted(set(chapters))
+    files = []
+    for ch in chapters:
+        segments = project.segments(ch)
+        if not segments:
+            raise FileNotFoundError(f"缺少第 {ch} 话的分段图，请先 render")
+        files.extend(segments)
+    if not files:
+        raise FileNotFoundError("没有可导出的分段图，请先 render")
+    html = to_html(project, chapters=chapters)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_STORED) as z:
         z.write(html, "index.html")
         for f in files:

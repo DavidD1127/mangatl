@@ -57,9 +57,10 @@ def run(project: Project, chapter: int, min_letters: int = 4,
         tile.save(tile_path)
         try:
             res, _ = engine(str(tile_path), use_cls=False)
-        except Exception:  # noqa: BLE001
-            y += WIN - OVERLAP
-            continue
+        except Exception as exc:
+            tile_path.unlink(missing_ok=True)
+            im.close()
+            raise RuntimeError(f"ch{chapter}: 复检在 y={y} 失败，未生成本次复检结果") from exc
         for item in res or []:
             box, text, score = item[0], item[1], float(item[2])
             if score < 0.5:
@@ -77,6 +78,7 @@ def run(project: Project, chapter: int, min_letters: int = 4,
         y += WIN - OVERLAP
 
     tile_path.unlink(missing_ok=True)
+    im.close()
     rows = list(found.values())
     if ignore_margin:
         # 扉页/尾页的汉化组署名会一直在，按 project.json 的边距砍掉
